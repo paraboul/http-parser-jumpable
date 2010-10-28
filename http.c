@@ -126,8 +126,8 @@ struct _http_parser {
 
 static int state_transition_table[NR_STATES][NR_CLASSES] = {
 /*  
-                                   white                                 etc           
-                               space |  \r\n  :  ,  "  \  /  +  -  . 09  |  *  E  G  T  P  H */
+                       nul   white                                 etc           
+                       | space |  \r\n  :  ,  "  \  /  +  -  . 09  |  *  E  G  T  P  H */
 /*start           GO*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G1,__,__,__},
 /*GE              G1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G2,__,__,__,__},
 /*GET             G2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G3,__,__},
