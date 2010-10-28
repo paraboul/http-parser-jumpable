@@ -143,7 +143,7 @@ static int state_transition_table[NR_STATES][NR_CLASSES] = {
 /*POS             P2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,P3},
 /*POST            P3*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,P4,__,__,__,__},
 /*POST            P4*/ {__,MP,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
-/* path	          PT*/ {__,PE,__,__,__,__,__,__,__,PT,PT,PT,PT,PT,PT,__,PT,PT,PT,PT,PT,__,__},
+/* path	          PT*/ {__,PE,__,__,__,__,__,__,__,PT,PT,PT,PT,PT,PT,__,PT,PT,PT,PT,PT,PT,PT},
 /*H 	          H1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H2,__,__},
 /*HT	          H2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H3,__,__,__,__},
 /*HTT	          H3*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H4,__,__,__,__},
@@ -154,8 +154,8 @@ static int state_transition_table[NR_STATES][NR_CLASSES] = {
 /*HTTP/[0-9]/[0-9]H8*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,HB,__,__,__,__,__,__,__,__,__},
 /* new line 	  EL*/ {__,__,__,ER,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
 /* \r expect \n   ER*/ {__,__,__,__,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
-/* header key 	  HK*/ {__,__,__,__,__,KH,__,__,__,__,__,HK,__,__,HK,__,HK,HK,HK,HK,HK,__,__},
-/* header value   HV*/ {__,HV,__,VH,VH,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,__,__},
+/* header key 	  HK*/ {__,__,__,__,__,KH,__,__,__,__,__,HK,__,__,HK,__,HK,HK,HK,HK,HK,HK,HK},
+/* header value   HV*/ {__,HV,__,VH,VH,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HK,HK},
 };
 
 /* compiled as jump table by gcc */
@@ -196,11 +196,11 @@ static int parse_http_char(struct _http_parser *parser, const unsigned char c)
 				parser->callback(parser->ctx, HTTP_VERSION_MINOR, c-48, parser->step);
 				parser->state = EL;
 				break;
-			case KH:
+			case KH: /* Header key */
 				parser->callback(parser->ctx, HTTP_HEADER_KEY, 0, parser->step);
 				parser->state = HV;
 				break;
-			case VH:
+			case VH: /* Header value */
 				parser->callback(parser->ctx, HTTP_HEADER_VAL, 0, parser->step);
 				parser->state = (c_classe == C_CR ? ER : HK); /* \r\n or \n */
 				break;				
