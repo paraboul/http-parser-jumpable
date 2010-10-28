@@ -1,5 +1,6 @@
 /* (c) 2010 Anthony Catel */
 /* WIP */
+/* gcc -fshort-enums */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,8 @@ typedef enum classes {
 	C_T,	/* T */
 	C_P,	/* P */
 	C_H,	/* H */
+	C_O,	/* O */
+	C_S,	/* S */
 	NR_CLASSES
 } parser_class;
 
@@ -57,8 +60,8 @@ static int ascii_class[128] = {
 	C_DIGIT,  C_DIGIT, C_COLON,  C_ETC,    C_ETC,   C_ETC,   C_ETC,   C_ETC,
 	
 	C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_E,     C_ETC,   C_G,
-	C_H,     C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,
-	C_P,   	 C_ETC,   C_ETC,   C_ETC,   C_T,     C_ETC,   C_ETC,   C_ETC,
+	C_H,     C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_O,
+	C_P,   	 C_ETC,   C_ETC,   C_S,     C_T,     C_ETC,   C_ETC,   C_ETC,
 	C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_BACKS, C_ETC,   C_ETC,   C_ETC,
 	
 	C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,   C_ETC,
@@ -73,6 +76,10 @@ typedef enum states {
 	G1, /* GE */
 	G2, /* GET */
 	G3, /* GET  */
+	P1, /* PO */
+	P2, /* POS */
+	P3, /* POST */
+	P4, /* POST  */
 	PT, /* path */
 	H1, /* H */
 	H2, /* HT */
@@ -127,28 +134,32 @@ struct _http_parser {
 static int state_transition_table[NR_STATES][NR_CLASSES] = {
 /*  
                        nul   white                                 etc           
-                       | space |  \r\n  :  ,  "  \  /  +  -  . 09  |  *  E  G  T  P  H */
-/*start           GO*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G1,__,__,__},
-/*GE              G1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G2,__,__,__,__},
-/*GET             G2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G3,__,__},
-/*GET             G3*/ {__,MG,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
-/* path	          PT*/ {__,PE,__,__,__,__,__,__,__,PT,PT,PT,PT,PT,PT,__,PT,PT,PT,PT,PT},
-/*H 	          H1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H2},
-/*HT	          H2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H3,__,__},
-/*HTT	          H3*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H4,__,__},
-/*HTTP	          H4*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H5,__},
-/*HTTP/	          H5*/ {__,__,__,__,__,__,__,__,__,H6,__,__,__,__,__,__,__,__,__,__,__},
-/*HTTP/[0-9]      H6*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,HA,__,__,__,__,__,__,__},
-/*HTTP/[0-9]/     H7*/ {__,__,__,__,__,__,__,__,__,__,__,__,H8,__,__,__,__,__,__,__,__},
-/*HTTP/[0-9]/[0-9]H8*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,HB,__,__,__,__,__,__,__},
-/* new line 	  EL*/ {__,__,__,ER,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
-/* \r expect \n   ER*/ {__,__,__,__,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
-/* header key 	  HK*/ {__,__,__,__,__,KH,__,__,__,__,__,HK,__,__,HK,__,HK,HK,HK,HK,HK},
-/* header value   HV*/ {__,HV,__,VH,VH,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV},
+                       | space |  \r\n  :  ,  "  \  /  +  -  . 09  |  *  E  G  T  P  H  O  S*/
+/*start           GO*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G1,__,P1,__,__,__},
+/*GE              G1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G2,__,__,__,__,__,__},
+/*GET             G2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,G3,__,__,__,__},
+/*GET             G3*/ {__,MG,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
+/*PO              P1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,P2,__},
+/*POS             P2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,P3},
+/*POST            P3*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,P4,__,__,__,__},
+/*POST            P4*/ {__,MP,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
+/* path	          PT*/ {__,PE,__,__,__,__,__,__,__,PT,PT,PT,PT,PT,PT,__,PT,PT,PT,PT,PT,__,__},
+/*H 	          H1*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H2,__,__},
+/*HT	          H2*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H3,__,__,__,__},
+/*HTT	          H3*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H4,__,__,__,__},
+/*HTTP	          H4*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,H5,__,__,__},
+/*HTTP/	          H5*/ {__,__,__,__,__,__,__,__,__,H6,__,__,__,__,__,__,__,__,__,__,__,__,__},
+/*HTTP/[0-9]      H6*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,HA,__,__,__,__,__,__,__,__,__},
+/*HTTP/[0-9]/     H7*/ {__,__,__,__,__,__,__,__,__,__,__,__,H8,__,__,__,__,__,__,__,__,__,__},
+/*HTTP/[0-9]/[0-9]H8*/ {__,__,__,__,__,__,__,__,__,__,__,__,__,HB,__,__,__,__,__,__,__,__,__},
+/* new line 	  EL*/ {__,__,__,ER,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
+/* \r expect \n   ER*/ {__,__,__,__,HK,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__,__},
+/* header key 	  HK*/ {__,__,__,__,__,KH,__,__,__,__,__,HK,__,__,HK,__,HK,HK,HK,HK,HK,__,__},
+/* header value   HV*/ {__,HV,__,VH,VH,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,HV,__,__},
 };
 
 /* compiled as jump table by gcc */
-static int parse_http_char(struct _http_parser *parser, char c)
+static int parse_http_char(struct _http_parser *parser, const unsigned char c)
 {
 	
 	parser_class c_classe = ascii_class[c];
@@ -167,6 +178,10 @@ static int parse_http_char(struct _http_parser *parser, char c)
 		switch(state) {
 			case MG: /* GET detected */
 				parser->callback(parser->ctx, HTTP_METHOD, HTTP_GET, parser->step);
+				parser->state = PT;
+				break;
+			case MP:
+				parser->callback(parser->ctx, HTTP_METHOD, HTTP_POST, parser->step);
 				parser->state = PT;
 				break;
 			case PE: /* End of path */
@@ -207,6 +222,7 @@ static int parse_callback(void *ctx, callback_type type, int value, uint32_t ste
 					printf("GET method detected\n");
 					break;
 				case HTTP_POST:
+					printf("POST method detected\n");
 					break;
 			}
 			break;
@@ -245,7 +261,7 @@ int main()
 	p.ctx 	= &p;
 	p.callback = parse_callback;
 	
-	char chaine[] = "GET /foo/bar/beer HTTP/1.1\nContent-Length: 42\r\nfoo: bar\n";
+	char chaine[] = "POST /foo/bar/beer HTTP/1.1\nContent-Length: 42\r\nfoo: bar\n";
 	
 	for (length = 0; length < strlen(chaine); length++) {
 		if (parse_http_char(&p, chaine[length]) == 0) {
